@@ -32,11 +32,12 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
+#model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
+model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters())
 
-# 开始训练
+# start training
 print("training start!")
 time_start = time.time()
 for epoch in range(12):  # loop over the dataset multiple times
@@ -60,7 +61,7 @@ print("training is over, total training time:", (time.time() - time_start) / 60,
 PATH = 'resnet26_cifar10.pth'
 torch.save(model.state_dict(), PATH)
 
-# 验证模型
+# test the accuracy
 correct = 0
 total = 0
 with torch.no_grad():

@@ -27,6 +27,7 @@ parser.add_argument('--net_t', type=str, required=True, choices=['resnet26'], he
 
 cuda = torch.device('cuda')
 
+
 # 0.5 for ce and 0.9 for kd
 def main():
     global args
@@ -58,7 +59,6 @@ def main():
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-
     net_t = model_dict[args.net_t]()
     net_t = torch.nn.DataParallel(net_t)  # 并行计算
     net_t = net_t.cuda()
@@ -76,7 +76,7 @@ def main():
 
     trainable_list = nn.ModuleList([])
     trainable_list.append(net_s)
-    # conector目的：让student网络输出的feature达到和teacher网络输出的feature一样的维度
+    # connector目的：让student网络输出的feature达到和teacher网络输出的feature一样的维度
     connector = torch.nn.DataParallel(transfer_conv(net_s.module.fea_dim, net_t.module.fea_dim)).cuda()
     trainable_list.append(connector)
 
@@ -134,7 +134,7 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
         meters=[batch_time, data_time, losses, losses_ce, losses_kd, top1],
         prefix="Epoch: [{}]".format(epoch))
 
-    net_s.train()     # 将网络调整到训练模式
+    net_s.train()  # 将网络调整到训练模式
     connector.train()  # 将网络调整到训练模式
     end = time.time()
     for idx, data in enumerate(train_loader):
@@ -145,7 +145,7 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
 
         with torch.no_grad():  # 老师网络的部分不进行梯度计算
             feat_t, pred_t = net_t(img, is_adain=True)  # 老师网络倒数第二层的输出，以及最终的输出
-        feat_s, pred_s = net_s(img, is_adain=True)      # 学生网络倒数第二层的输出，以及最终的输出
+        feat_s, pred_s = net_s(img, is_adain=True)  # 学生网络倒数第二层的输出，以及最终的输出
         feat_s = connector(feat_s)  # 将学生网络倒数第二层的输出经过该模型变成和老师网络倒数第二层输出一样的维度
 
         loss_stat = statm_loss()(feat_s, feat_t.detach())  # 计算老师和学生输出feature的差异
