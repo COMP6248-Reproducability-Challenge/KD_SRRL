@@ -32,8 +32,8 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle
 
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-#model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
-model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26
+model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
+#model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26 for multiple GPU, but there will be some small problems when loading the model
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters())
 
@@ -64,6 +64,7 @@ torch.save(model.state_dict(), PATH)
 # test the accuracy
 correct = 0
 total = 0
+model.eval()
 with torch.no_grad():
     for data in testloader:
         images, labels = data[0].to(device), data[1].to(device)
@@ -72,4 +73,4 @@ with torch.no_grad():
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-print('Accuracy of the network on the 10000 test images: %d %%' % (100 * correct / total))
+print('Accuracy of the network on the 10000 test images: %5f %%' % (100 * correct / total))

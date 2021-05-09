@@ -228,7 +228,7 @@ def resnet26(file="models/resnet26_cifar10_83.pth"):
     :return:
     '''
     model = ResNet(26, 10, bottleneck=False)  # 参数个数：369690 cifar10作为老师
-    # state_dict = load_state_dict_from_url(model_urls['resnet34'], progress=True)
+    #model = nn.DataParallel(model)
     model.load_state_dict(torch.load(file))
     return model
 
