@@ -5,6 +5,7 @@ from models.ResNet import ResNet
 import torch.optim as optim
 import torch.nn as nn
 import time
+from utils.utils import lr_step_policy
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("device:", device)
@@ -35,12 +36,16 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
 #model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26 for multiple GPU, but there will be some small problems when loading the model
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters())
+#optimizer = optim.Adam(model.parameters())
+optimizer = optim.SGD(model.parameters(), lr=0.1)
+lr_scheduler = lr_step_policy(0.1, [150, 250, 320], 0.1, 0)
 
 # start training
 print("training start!")
 time_start = time.time()
-for epoch in range(12):  # loop over the dataset multiple times
+max_accuracy = 0
+for epoch in range(350):
+    lr_scheduler(optimizer, epoch)
     running_loss = 0.0
     for i, data in enumerate(trainloader):
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -53,11 +58,29 @@ for epoch in range(12):  # loop over the dataset multiple times
         # print statistics
         running_loss += loss.item()
         if i % 100 == 99:    # print every 100 mini-batches
-            print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 2000))
+            print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, running_loss / 2000))
             running_loss = 0.0
+
+    # after every epoch, test the model
+    correct = 0
+    total = 0
+    model.eval()
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data[0].to(device), data[1].to(device)
+            outputs = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        accuracy = correct / total
+        print("epoch:", epoch, "test accuracy:", accuracy, "time:", (time.time() - time_start) / 60, 'mins')
+        if accuracy > max_accuracy:
+            max_accuracy = accuracy
+            torch.save(model.state_dict(), 'max_accuracy.pth')
+
 print("training is over, total training time:", (time.time() - time_start) / 60, 'mins')
 
-# save the model
+# save the final model
 PATH = 'resnet26_cifar10.pth'
 torch.save(model.state_dict(), PATH)
 
