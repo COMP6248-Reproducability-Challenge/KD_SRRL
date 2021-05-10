@@ -37,7 +37,7 @@ model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
 #model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26 for multiple GPU, but there will be some small problems when loading the model
 criterion = nn.CrossEntropyLoss()
 #optimizer = optim.Adam(model.parameters())
-optimizer = optim.SGD(model.parameters(), lr=0.1)
+optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.5)
 lr_scheduler = lr_step_policy(0.1, [150, 250, 320], 0.1, 0)
 
 # start training
@@ -45,6 +45,7 @@ print("training start!")
 time_start = time.time()
 max_accuracy = 0
 for epoch in range(350):
+    model.train()
     lr_scheduler(optimizer, epoch)
     running_loss = 0.0
     for i, data in enumerate(trainloader):
@@ -58,7 +59,7 @@ for epoch in range(350):
         # print statistics
         running_loss += loss.item()
         if i % 100 == 99:    # print every 100 mini-batches
-            print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, running_loss / 2000))
+            print('[%d, %5d] loss: %.5f' % (epoch + 1, i + 1, running_loss / 100))
             running_loss = 0.0
 
     # after every epoch, test the model

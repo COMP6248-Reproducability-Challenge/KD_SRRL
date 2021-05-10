@@ -222,7 +222,7 @@ def resnet14():
     return model
 
 
-def resnet26(file="models/resnet26_cifar10_83.pth"):
+def resnet26(file="models/resnet26_cifar10_895.pth"):
     '''
     当老师的料
     :return:

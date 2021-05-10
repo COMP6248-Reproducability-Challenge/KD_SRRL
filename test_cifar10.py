@@ -1,13 +1,17 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
-from models.ResNet import resnet26
-
+from models.ResNet import resnet26, resnet8
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("device:", device)
 
-model = resnet26('resnet26_cifar10_86.pth').to(device)
+model = resnet26('max_accuracy.pth').to(device)
+
+#model = resnet8()
+#model.load_state_dict(torch.load('resnet8_cifar10.pth'))
+#model.to(device)
+
 batch_size = 128
 
 transform_test = transforms.Compose([
