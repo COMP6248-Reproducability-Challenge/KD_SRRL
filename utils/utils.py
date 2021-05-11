@@ -253,3 +253,18 @@ class Params():
     def dict(self):
         """Gives dict-like access to Params instance by `params.dict['learning_rate']"""
         return self.__dict__
+
+
+def sr_loss(q, p, type='L2', target=None, temperature=1):
+    if type == 'L2':
+        return F.mse_loss(q, p)
+    elif type == 'CE':
+        if target is None:
+            raise Exception("CE loss needs the target")
+        return F.cross_entropy(q, target)
+    elif type == 'KL':
+        q_logsoftmax = F.log_softmax(q / temperature, dim=1)
+        p_softmax = F.softmax(p / temperature, dim=1)
+        return F.kl_div(q_logsoftmax, p_softmax, reduction='batchmean')
+    else:
+        raise Exception("Invalid SR loss type, please choose from 'L2','CE' or 'KL'")

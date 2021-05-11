@@ -6,11 +6,11 @@ from models.ResNet import resnet26, resnet8
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("device:", device)
 
-model = resnet26('max_accuracy.pth').to(device)
+#model = resnet26('max_accuracy.pth').to(device)
 
-#model = resnet8()
-#model.load_state_dict(torch.load('resnet8_cifar10.pth'))
-#model.to(device)
+model = resnet8()
+model.load_state_dict(torch.load('resnet8_cifar10.pth'))
+model.to(device)
 
 batch_size = 128
 

@@ -21,6 +21,8 @@ parser.add_argument('--lr', type=float, default=0.2, help='initial learning rate
 parser.add_argument('--epochs', type=int, default=100, help='number of total epochs')
 parser.add_argument('--batch_size', type=int, default=512, help='batch size')
 parser.add_argument('--weight_decay', type=float, default=1e-4, help='weight decay 1e-4')
+parser.add_argument('--alpha', type=float, default=1, help='FM loss weight')
+parser.add_argument('--beta', type=float, default=1, help='SR loss weight')
 # net and dataset choosen
 parser.add_argument('--net_s', type=str, required=True, choices=['resnet8', 'resnet14'], help='')
 parser.add_argument('--net_t', type=str, required=True, choices=['resnet26'], help='')
@@ -32,9 +34,6 @@ cuda = torch.device('cuda')
 def main():
     global args
     args = parser.parse_args()
-
-    args.net_s = 'resnet8'
-    args.weight = 1
 
     cur_path = os.path.abspath(os.curdir)
     save_path = os.path.join(cur_path, 'results')
@@ -150,12 +149,13 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
 
         loss_stat = statm_loss()(feat_s, feat_t.detach())  # 计算老师和学生输出feature的差异
         pred_sc = net_t(x=None, feat_s=feat_s)  # 将学生的feature替换掉老师的feature，得到预测结果
-        loss_kd = loss_stat + F.mse_loss(pred_sc, pred_t)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
+        #loss_kd = args.alpha * loss_stat + args.beta * F.mse_loss(pred_sc, pred_t)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
+        loss_kd = args.alpha * loss_stat + args.beta * sr_loss(pred_sc, pred_t, type='L2')  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
         # 个人认为KD loss就是论文里的FM loss + SR loss  （软目标）
 
         loss_ce = F.cross_entropy(pred_s, target)  # CE loss=学生预测结果与真实结果的交叉熵（硬目标）
 
-        loss = loss_ce + loss_kd * args.weight  # 论文中的alpha beta是同样的？
+        loss = loss_ce + loss_kd   #* args.weight  # 论文中的alpha beta是同样的？
         prec1, prec5 = accuracy(pred_s, target, topk=(1, 5))
         optimizer.zero_grad()
         loss.backward()
