@@ -24,6 +24,7 @@ parser.add_argument('--weight_decay', type=float, default=0, help='weight decay'
 parser.add_argument('--alpha', type=float, default=1, help='FM loss weight')
 parser.add_argument('--beta', type=float, default=1, help='SR loss weight')
 parser.add_argument('--sr_loss', type=str, default='L2', choices=['L2', 'CE', 'KL'], help='three types of SR loss')
+parser.add_argument('--temperature', type=float, default=1, help='temperature of SR-KL loss')
 # net and dataset choosen
 parser.add_argument('--net_s', type=str, required=True, choices=['resnet8', 'resnet14'], help='')
 parser.add_argument('--net_t', type=str, required=True, choices=['resnet26'], help='')
@@ -149,14 +150,20 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
         feat_s, pred_s = net_s(img, is_adain=True)  # 学生网络倒数第二层的输出，以及最终的输出
         feat_s = connector(feat_s)  # 将学生网络倒数第二层的输出经过该模型变成和老师网络倒数第二层输出一样的维度
 
+        # FM loss
         loss_stat = statm_loss()(feat_s, feat_t.detach())  # 计算老师和学生输出feature的差异
+
+        # SR loss
         pred_sc = net_t(x=None, feat_s=feat_s)  # 将学生的feature替换掉老师的feature，得到预测结果
-        #loss_kd = args.alpha * loss_stat + args.beta * F.mse_loss(pred_sc, pred_t)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
-        loss_kd = args.alpha * loss_stat + args.beta * sr_loss(pred_sc, pred_t, type=args.sr_loss)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
-        # 个人认为KD loss就是论文里的FM loss + SR loss  （软目标）
+        loss_sr = sr_loss(pred_sc, pred_t, type=args.sr_loss, target=target, temperature=args.temperature)
 
-        loss_ce = F.cross_entropy(pred_s, target)  # CE loss=学生预测结果与真实结果的交叉熵（硬目标）
+        # 个人认为KD loss就是论文里的FM loss + SR loss（软目标）
+        loss_kd = args.alpha * loss_stat + args.beta * loss_sr
 
+        # CE loss=学生预测结果与真实结果的交叉熵（硬目标）
+        loss_ce = F.cross_entropy(pred_s, target)
+
+        # total loss
         loss = loss_ce + loss_kd   #* args.weight  # 论文中的alpha beta是同样的？
         prec1, prec5 = accuracy(pred_s, target, topk=(1, 5))
         optimizer.zero_grad()
