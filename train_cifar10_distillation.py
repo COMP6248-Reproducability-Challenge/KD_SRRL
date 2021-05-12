@@ -32,7 +32,6 @@ parser.add_argument('--net_t', type=str, required=True, choices=['resnet26'], he
 cuda = torch.device('cuda')
 
 
-# 0.5 for ce and 0.9 for kd
 def main():
     global args
     args = parser.parse_args()
@@ -87,7 +86,7 @@ def main():
 
     lr_scheduler = lr_step_policy(args.lr, [150, 250, 320], 0.1, 0)  # 用于训练过程中调整学习率，返回的是一个函数
 
-    # 验证
+    # 测试
     val_top1, val_top5 = test2(testloader, net_t)
     print('net_t:%.2f,%.2f' % (val_top1, val_top5))
     logging.info('net_t:%.2f,%.2f' % (val_top1, val_top5))
