@@ -15,14 +15,15 @@ cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='knowledge distillation')
 # training hyper parameters
 parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
-parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
+parser.add_argument('--momentum', type=float, default=0, help='momentum')
 parser.add_argument('--workers', type=int, default=16, help='workers')
-parser.add_argument('--lr', type=float, default=0.2, help='initial learning rate 0.2')
-parser.add_argument('--epochs', type=int, default=100, help='number of total epochs')
+parser.add_argument('--lr', type=float, default=0.1, help='initial learning rate 0.1')
+parser.add_argument('--epochs', type=int, default=350, help='number of total epochs')
 parser.add_argument('--batch_size', type=int, default=512, help='batch size')
-parser.add_argument('--weight_decay', type=float, default=1e-4, help='weight decay 1e-4')
+parser.add_argument('--weight_decay', type=float, default=0, help='weight decay')
 parser.add_argument('--alpha', type=float, default=1, help='FM loss weight')
 parser.add_argument('--beta', type=float, default=1, help='SR loss weight')
+parser.add_argument('--sr_loss', type=str, default='L2', choices=['L2', 'CE', 'KL'], help='three types of SR loss')
 # net and dataset choosen
 parser.add_argument('--net_s', type=str, required=True, choices=['resnet8', 'resnet14'], help='')
 parser.add_argument('--net_t', type=str, required=True, choices=['resnet26'], help='')
@@ -83,8 +84,9 @@ def main():
                                 weight_decay=args.weight_decay)
     net_s, optimizer, last_epoch, best_epoch, best_top1, best_top5 = load_checkpoints(net_s, optimizer, model_file)
 
-    lr_scheduler = lr_step_policy(args.lr, [30, 60, 90], 0.1, 0)  # 用于训练过程中调整学习率，返回的是一个函数
+    lr_scheduler = lr_step_policy(args.lr, [150, 250, 320], 0.1, 0)  # 用于训练过程中调整学习率，返回的是一个函数
 
+    # 验证
     val_top1, val_top5 = test2(testloader, net_t)
     print('net_t:%.2f,%.2f' % (val_top1, val_top5))
     logging.info('net_t:%.2f,%.2f' % (val_top1, val_top5))
@@ -150,7 +152,7 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
         loss_stat = statm_loss()(feat_s, feat_t.detach())  # 计算老师和学生输出feature的差异
         pred_sc = net_t(x=None, feat_s=feat_s)  # 将学生的feature替换掉老师的feature，得到预测结果
         #loss_kd = args.alpha * loss_stat + args.beta * F.mse_loss(pred_sc, pred_t)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
-        loss_kd = args.alpha * loss_stat + args.beta * sr_loss(pred_sc, pred_t, type='L2')  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
+        loss_kd = args.alpha * loss_stat + args.beta * sr_loss(pred_sc, pred_t, type=args.sr_loss)  # KD loss=老师学生之间feature的差异+老师学生预测结果的差异？
         # 个人认为KD loss就是论文里的FM loss + SR loss  （软目标）
 
         loss_ce = F.cross_entropy(pred_s, target)  # CE loss=学生预测结果与真实结果的交叉熵（硬目标）

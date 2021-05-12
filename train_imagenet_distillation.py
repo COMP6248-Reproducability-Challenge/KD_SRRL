@@ -38,7 +38,7 @@ def main():
     create_logger(os.path.join(save_path, 'logs'))
     shutil.copy2('train_imagenet_distillation.py', save_path)
     shutil.copy2('models/official_resnet.py', save_path)
-    #train_loader, test_loader = get_imagenet_dataloader(batch_size=args.batch_size, num_workers=args.workers)
+    train_loader, test_loader = get_imagenet_dataloader(batch_size=args.batch_size, num_workers=args.workers)
 
     net_t = model_dict[args.net_t](num_class=1000)
     net_t = torch.nn.DataParallel(net_t)  # 并行计算

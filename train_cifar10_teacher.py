@@ -34,10 +34,14 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle
 classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 model = ResNet(26, 10, bottleneck=False).to(device)  # ResNet-26
+#model = ResNet(14, 10, bottleneck=False).to(device)  # ResNet-14
 #model = nn.DataParallel(ResNet(26, 10, bottleneck=False)).to(device)  # ResNet-26 for multiple GPU, but there will be some small problems when loading the model
+
 criterion = nn.CrossEntropyLoss()
+
 #optimizer = optim.Adam(model.parameters())
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.5)
+optimizer = optim.SGD(model.parameters(), lr=0.1)
+
 lr_scheduler = lr_step_policy(0.1, [150, 250, 320], 0.1, 0)
 
 # start training
