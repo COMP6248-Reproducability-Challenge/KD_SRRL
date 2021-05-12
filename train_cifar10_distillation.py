@@ -60,7 +60,7 @@ def main():
     testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
     net_t = model_dict[args.net_t]()
-    net_t = torch.nn.DataParallel(net_t)  # 并行计算
+    net_t = torch.nn.DataParallel(net_t)
     net_t = net_t.cuda()
     net_t.eval()
     for param in net_t.parameters():
@@ -76,7 +76,7 @@ def main():
 
     trainable_list = nn.ModuleList([])
     trainable_list.append(net_s)
-    # connector目的：让student网络输出的feature达到和teacher网络输出的feature一样的维度
+    # connector: make the dimension of feature from student the same as that from teacher
     connector = torch.nn.DataParallel(transfer_conv(net_s.module.fea_dim, net_t.module.fea_dim)).cuda()
     trainable_list.append(connector)
 
@@ -84,9 +84,9 @@ def main():
                                 weight_decay=args.weight_decay)
     net_s, optimizer, last_epoch, best_epoch, best_top1, best_top5 = load_checkpoints(net_s, optimizer, model_file)
 
-    lr_scheduler = lr_step_policy(args.lr, [150, 250, 320], 0.1, 0)  # 用于训练过程中调整学习率，返回的是一个函数
+    lr_scheduler = lr_step_policy(args.lr, [150, 250, 320], 0.1, 0)  # adjust the learning rate during the training
 
-    # 测试
+    # test
     val_top1, val_top5 = test2(testloader, net_t)
     print('net_t:%.2f,%.2f' % (val_top1, val_top5))
     logging.info('net_t:%.2f,%.2f' % (val_top1, val_top5))
@@ -95,14 +95,14 @@ def main():
     logging.info('epochs:%d net_s:%.2f,%.2f' % (args.epochs, val_top1, val_top5))
 
     for epoch in range(last_epoch + 1, args.epochs):
-        # 训练
-        lr_scheduler(optimizer, epoch)  # 根据当前的epoch，调整optimizer的学习率
+        # train
+        lr_scheduler(optimizer, epoch)  # according to the epoch, adjust the learning rate
         epoch_start_time = time.time()
         train(trainloader, net_t, net_s, optimizer, connector, epoch)
         epoch_time = time.time() - epoch_start_time
         print('one epoch time is {:02}h{:02}m{:02}s'.format(*transform_time(epoch_time)))
 
-        # 测试
+        # test
         print('testing the models......')
         test_start_time = time.time()
         val_top1, val_top5 = test2(testloader, net_s)
@@ -121,7 +121,7 @@ def main():
 
 
 def train(train_loader, net_t, net_s, optimizer, connector, epoch):
-    # 对一些数据继续记录，以计算平均值
+
     batch_time = AverageMeter('Time', ':.3f')
     data_time = AverageMeter('Data', ':.3f')
     losses = AverageMeter('Loss', ':.3f')
@@ -135,8 +135,8 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
         meters=[batch_time, data_time, losses, losses_ce, losses_kd, top1],
         prefix="Epoch: [{}]".format(epoch))
 
-    net_s.train()  # 将网络调整到训练模式
-    connector.train()  # 将网络调整到训练模式
+    net_s.train()
+    connector.train()
     end = time.time()
     for idx, data in enumerate(train_loader):
         data_time.update(time.time() - end)
@@ -144,32 +144,32 @@ def train(train_loader, net_t, net_s, optimizer, connector, epoch):
         img = img.cuda()
         target = target.cuda()
 
-        with torch.no_grad():  # 老师网络的部分不进行梯度计算
-            feat_t, pred_t = net_t(img, is_adain=True)  # 老师网络倒数第二层的输出，以及最终的输出
-        feat_s, pred_s = net_s(img, is_adain=True)  # 学生网络倒数第二层的输出，以及最终的输出
-        feat_s = connector(feat_s)  # 将学生网络倒数第二层的输出经过该模型变成和老师网络倒数第二层输出一样的维度
+        with torch.no_grad():  # the teacher network is fixed
+            feat_t, pred_t = net_t(img, is_adain=True)  # the feature from the penultimate layer of the teacher network and the final output
+        feat_s, pred_s = net_s(img, is_adain=True)  # the feature from the penultimate layer of the student network and the final output
+        feat_s = connector(feat_s)  # synchronize the dimensions of two features
 
         # FM loss
-        loss_stat = statm_loss()(feat_s, feat_t.detach())  # 计算老师和学生输出feature的差异
+        loss_stat = statm_loss()(feat_s, feat_t.detach())  # the difference between features from teacher and student
 
         # SR loss
-        pred_sc = net_t(x=None, feat_s=feat_s)  # 将学生的feature替换掉老师的feature，得到预测结果
+        pred_sc = net_t(x=None, feat_s=feat_s)  # Replace the feature of the student with the feature of the teacher to get the prediction result
         loss_sr = sr_loss(pred_sc, pred_t, type=args.sr_loss, target=target, temperature=args.temperature)
 
-        # 个人认为KD loss就是论文里的FM loss + SR loss（软目标）
+        # KD loss = FM loss + SR loss (soft target in the original paper)
         loss_kd = args.alpha * loss_stat + args.beta * loss_sr
 
-        # CE loss=学生预测结果与真实结果的交叉熵（硬目标）
+        # CE loss = the cross entropy between the prediction from student and the true label (hard target)
         loss_ce = F.cross_entropy(pred_s, target)
 
         # total loss
-        loss = loss_ce + loss_kd   #* args.weight  # 论文中的alpha beta是同样的？
+        loss = loss_ce + loss_kd
         prec1, prec5 = accuracy(pred_s, target, topk=(1, 5))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # 更新各种统计数据的平均值（注意其中考虑了batch size）
+        # update the average value of those statistical data considering the batch size
         losses_ce.update(loss_ce.detach().item(), img.size(0))
         losses_kd.update(loss_kd.detach().item(), img.size(0))
         losses.update(loss.detach().item(), img.size(0))
